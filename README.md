@@ -29,6 +29,7 @@ Milestone 2:
 - If the script file cannot be opened, print an error and return `1`.
 
 Milestone 3:
+
 **Assumptions & Implementation**  
 - Any other input is treated as an external command:
   1. Split the command line into an argument.  
@@ -38,3 +39,13 @@ Milestone 3:
   4. In the parent, call `waitpid` to wait for the child.  
   5. After the child terminates, display the next prompt or continue to the next line in the script.  
 - If `fork()` fails, immediately print `bad command` and return to prompt.
+
+Milestone 4:
+
+**Assumptions & Implementation**  
+- `SIGINT` and `SIGTSTP` implemented using `sigaction()`.    
+  - The shell itself never exits or stops.
+- The global `foreground_pid` is set to the child’s PID before `waitpid()`, and reset to 0 when the child exits.  
+- The integer `last_status` stores the exit code of the most recent external command.  
+- New built-in:  
+  - `echo $?` prints the previous command’s exit code.
