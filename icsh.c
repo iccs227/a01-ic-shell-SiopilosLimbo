@@ -14,6 +14,7 @@ int main(int argc, char *argv[]) {
     char lastCommand[MAX_CMD_BUFFER] = "";
     FILE *infile = stdin;
     int isScript = 0;
+
     if (argc == 2) {
         infile = fopen(argv[1], "r");
         if (infile == NULL) {
@@ -69,7 +70,8 @@ int main(int argc, char *argv[]) {
             } else {
                 printf("bad command\n");
             }
-        } else if (strncmp(cmd, "exit", 4) == 0) {
+        }
+        else if (strncmp(cmd, "exit", 4) == 0) {
             if (strcmp(cmd, "exit") == 0) {
                 printf("bye\n");
                 if (isScript) {
@@ -86,8 +88,28 @@ int main(int argc, char *argv[]) {
             } else {
                 printf("bad command\n");
             }
-        } else {
-            printf("bad command\n");
+        }
+        else {
+            char *argv_exec[MAX_CMD_BUFFER / 2 + 1];
+            int argCount = 0;
+            char *token2 = strtok(cmd, " ");
+            while (token2 != NULL && argCount < (MAX_CMD_BUFFER / 2)) {
+                argv_exec[argCount++] = token2;
+                token2 = strtok(NULL, " ");
+            }
+            argv_exec[argCount] = NULL;
+
+            pid_t pid = fork();
+            if (pid < 0) {
+                perror("fork");
+            } else if (pid == 0) {
+                execvp(argv_exec[0], argv_exec);
+                printf("bad command\n");
+                exit(1);
+            } else {
+                int status;
+                waitpid(pid, &status, 0);
+            }
         }
     }
     if (isScript) {
@@ -95,4 +117,3 @@ int main(int argc, char *argv[]) {
     }
     return 0;
 }
-

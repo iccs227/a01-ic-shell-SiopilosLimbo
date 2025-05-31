@@ -26,4 +26,15 @@ Milestone 2:
 - Lines in a script behave just like interactive commands:  
 - Empty lines in the script are skipped.  
 - On EOF (end‐of‐file) in script mode, `icsh` just  exits.  
-- If the script file cannot be opened, print an error and return `1`. 
+- If the script file cannot be opened, print an error and return `1`.
+
+Milestone 3:
+**Assumptions & Implementation**  
+- Any other input is treated as an external command:
+  1. Split the command line into an argument.  
+  2. `fork()` a child process.  
+  3. In the child, call `execvp(argv_exec[0], argv_exec)`.  
+     - If child fails, print `bad command` and `exit(1)`.  
+  4. In the parent, call `waitpid` to wait for the child.  
+  5. After the child terminates, display the next prompt or continue to the next line in the script.  
+- If `fork()` fails, immediately print `bad command` and return to prompt.
