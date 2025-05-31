@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <fcntl.h>
 
 #define MAX_CMD_BUFFER 255
 
@@ -93,71 +94,220 @@ int main(int argc, char *argv[]) {
             strcpy(lastCommand, cmd);
         }
 
-        if (strcmp(cmd, "echo $?") == 0) {
-            printf("%d\n", last_status);
+        char *input_file = NULL;
+        char *output_file = NULL;
+        char *tokens[MAX_CMD_BUFFER / 2 + 1];
+        int tokenCount = 0;
+
+        char *saveptr;
+        char *piece = strtok_r(cmd, " ", &saveptr);
+        while (piece != NULL) {
+            if (strcmp(piece, "<") == 0) {
+                piece = strtok_r(NULL, " ", &saveptr);
+                if (piece == NULL) {
+                    fprintf(stderr, "Error: no input file specified\n");
+                    last_status = 1;
+                    break;
+                }
+                input_file = piece;
+            }
+            else if (strcmp(piece, ">") == 0) {
+                piece = strtok_r(NULL, " ", &saveptr);
+                if (piece == NULL) {
+                    fprintf(stderr, "Error: no output file specified\n");
+                    last_status = 1;
+                    break;
+                }
+                output_file = piece;
+            }
+            else {
+                tokens[tokenCount++] = piece;
+            }
+            piece = strtok_r(NULL, " ", &saveptr);
+        }
+        tokens[tokenCount] = NULL;
+
+        if (last_status == 1 && tokenCount == 0) {
             continue;
         }
-        else if (strncmp(cmd, "echo", 4) == 0) {
-            if (strcmp(cmd, "echo") == 0) {
-                printf("\n");
-                last_status = 0;
-            } else if (cmd[4] == ' ') {
-                printf("%s\n", cmd + 5);
-                last_status = 0;
-            } else {
-                printf("bad command\n");
-                last_status = 1;
-            }
-            continue;
-        }
-        else if (strncmp(cmd, "exit", 4) == 0) {
-            if (strcmp(cmd, "exit") == 0) {
-                printf("bye\n");
-                if (isScript) {
-                    fclose(infile);
-                }
-                exit(0);
-            } else if (cmd[4] == ' ') {
-                int code = atoi(cmd + 5) & 0xFF;
-                printf("bye\n");
-                if (isScript) {
-                    fclose(infile);
-                }
-                exit(code);
-            } else {
-                printf("bad command\n");
-                last_status = 1;
-            }
+        if (tokenCount == 0) {
+            printf("bad command\n");
+            last_status = 1;
             continue;
         }
 
-        char *argv_exec[MAX_CMD_BUFFER / 2 + 1];
-        int argCount = 0;
-        char *token2 = strtok(cmd, " ");
-        while (token2 != NULL && argCount < (MAX_CMD_BUFFER / 2)) {
-            argv_exec[argCount++] = token2;
-            token2 = strtok(NULL, " ");
+        if (strcmp(tokens[0], "echo") == 0 && tokenCount == 2 && strcmp(tokens[1], "$?") == 0) {
+            int old_stdout = -1;
+            int old_stdin = -1;
+            if (output_file != NULL) {
+                int fd_out = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                if (fd_out < 0) {
+                    fprintf(stderr, "Error: cannot open output file '%s'\n", output_file);
+                    last_status = 1;
+                    continue;
+                }
+                old_stdout = dup(STDOUT_FILENO);
+                dup2(fd_out, STDOUT_FILENO);
+                close(fd_out);
+            }
+            if (input_file != NULL) {
+                int fd_in = open(input_file, O_RDONLY);
+                if (fd_in < 0) {
+                    fprintf(stderr, "Error: cannot open input file '%s'\n", input_file);
+                    last_status = 1;
+                    continue;
+                }
+                old_stdin = dup(STDIN_FILENO);
+                dup2(fd_in, STDIN_FILENO);
+                close(fd_in);
+            }
+            printf("%d\n", last_status);
+            last_status = 0;
+            if (old_stdout >= 0) {
+                dup2(old_stdout, STDOUT_FILENO);
+                close(old_stdout);
+            }
+            if (old_stdin >= 0) {
+                dup2(old_stdin, STDIN_FILENO);
+                close(old_stdin);
+            }
+            continue;
         }
-        argv_exec[argCount] = NULL;
+        else if (strcmp(tokens[0], "echo") == 0) {
+            int old_stdout = -1;
+            int old_stdin = -1;
+            if (output_file != NULL) {
+                int fd_out = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                if (fd_out < 0) {
+                    fprintf(stderr, "Error: cannot open output file '%s'\n", output_file);
+                    last_status = 1;
+                    continue;
+                }
+                old_stdout = dup(STDOUT_FILENO);
+                dup2(fd_out, STDOUT_FILENO);
+                close(fd_out);
+            }
+            if (input_file != NULL) {
+                int fd_in = open(input_file, O_RDONLY);
+                if (fd_in < 0) {
+                    fprintf(stderr, "Error: cannot open input file '%s'\n", input_file);
+                    last_status = 1;
+                    continue;
+                }
+                old_stdin = dup(STDIN_FILENO);
+                dup2(fd_in, STDIN_FILENO);
+                close(fd_in);
+            }
+            if (tokenCount == 1) {
+                printf("\n");
+            } else {
+                for (int i = 1; i < tokenCount; i++) {
+                    printf("%s", tokens[i]);
+                    if (i < tokenCount - 1) printf(" ");
+                }
+                printf("\n");
+            }
+            last_status = 0;
+            if (old_stdout >= 0) {
+                dup2(old_stdout, STDOUT_FILENO);
+                close(old_stdout);
+            }
+            if (old_stdin >= 0) {
+                dup2(old_stdin, STDIN_FILENO);
+                close(old_stdin);
+            }
+            continue;
+        }
+        else if (strcmp(tokens[0], "exit") == 0) {
+            int old_stdout = -1;
+            int old_stdin = -1;
+            if (output_file != NULL) {
+                int fd_out = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                if (fd_out < 0) {
+                    fprintf(stderr, "Error: cannot open output file '%s'\n", output_file);
+                    last_status = 1;
+                    continue;
+                }
+                old_stdout = dup(STDOUT_FILENO);
+                dup2(fd_out, STDOUT_FILENO);
+                close(fd_out);
+            }
+            if (input_file != NULL) {
+                int fd_in = open(input_file, O_RDONLY);
+                if (fd_in < 0) {
+                    fprintf(stderr, "Error: cannot open input file '%s'\n", input_file);
+                    last_status = 1;
+                    continue;
+                }
+                old_stdin = dup(STDIN_FILENO);
+                dup2(fd_in, STDIN_FILENO);
+                close(fd_in);
+            }
+            if (tokenCount == 1) {
+                printf("bye\n");
+                if (isScript) fclose(infile);
+                exit(0);
+            } else {
+                long code = strtol(tokens[1], NULL, 10) & 0xFF;
+                printf("bye\n");
+                if (isScript) fclose(infile);
+                exit((int)code);
+            }
+            if (old_stdout >= 0) {
+                dup2(old_stdout, STDOUT_FILENO);
+                close(old_stdout);
+            }
+            if (old_stdin >= 0) {
+                dup2(old_stdin, STDIN_FILENO);
+                close(old_stdin);
+            }
+        }
 
         pid_t pid = fork();
         if (pid < 0) {
             printf("bad command\n");
             last_status = 1;
-        } else if (pid == 0) {
-            execvp(argv_exec[0], argv_exec);
+        }
+        else if (pid == 0) {
+            if (input_file != NULL) {
+                int fd_in = open(input_file, O_RDONLY);
+                if (fd_in < 0) {
+                    fprintf(stderr, "Error: cannot open input file '%s'\n", input_file);
+                    exit(1);
+                }
+                dup2(fd_in, STDIN_FILENO);
+                close(fd_in);
+            }
+            if (output_file != NULL) {
+                int fd_out = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                if (fd_out < 0) {
+                    fprintf(stderr, "Error: cannot open output file '%s'\n", output_file);
+                    exit(1);
+                }
+                dup2(fd_out, STDOUT_FILENO);
+                close(fd_out);
+            }
+            char *exec_argv[tokenCount + 1];
+            for (int i = 0; i < tokenCount; i++) {
+                exec_argv[i] = tokens[i];
+            }
+            exec_argv[tokenCount] = NULL;
+            execvp(exec_argv[0], exec_argv);
             printf("bad command\n");
             exit(1);
-        } else {
+        }
+        else {
             foreground_pid = pid;
             int status;
             waitpid(pid, &status, WUNTRACED);
             if (WIFEXITED(status)) {
                 last_status = WEXITSTATUS(status);
-            } else if (WIFSTOPPED(status)) {
+            }
+            else if (WIFSTOPPED(status)) {
                 printf("\n");
                 last_status = 1;
-            } else {
+            }
+            else {
                 last_status = 1;
             }
             foreground_pid = 0;

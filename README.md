@@ -49,3 +49,16 @@ Milestone 4:
 - The integer `last_status` stores the exit code of the most recent external command.  
 - New built-in:  
   - `echo $?` prints the previous command’s exit code.
+
+Milestone 5:
+
+**Assumptions & Implementation**  
+- Supports IO redirection  
+- Parsing strategy:  
+  1. Tokenize the command line on spaces.  
+  2. Whenever a token is exactly `<`, the next token is treated as `input_file`.    
+  3. Whenever a token is exactly `>`, the next token is treated as `output_file`.    
+  4. All other tokens become elements for `execvp()`.    
+- Print an error if no filename is given after redirection
+
+
