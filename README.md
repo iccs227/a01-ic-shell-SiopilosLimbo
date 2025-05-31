@@ -17,4 +17,13 @@ Milestone 1:
      - Anything else → `printf("bad command\n")`.
   6. Stores any new command (except `!!`) into `lastCommand` so `!!` can replay it.
 - An empty line (`cmd[0] == '\0'`) just goes straight back to the prompt.
- 
+
+Milestone 2:
+
+**Assumptions & Implementation**  
+- If `icsh` is run with no arguments, it remains in interactive mode.  
+- If given a file, it opens that file and reads it: no prompts or startup message are printed.  
+- Lines in a script behave just like interactive commands:  
+- Empty lines in the script are skipped.  
+- On EOF (end‐of‐file) in script mode, `icsh` just  exits.  
+- If the script file cannot be opened, print an error and return `1`. 
